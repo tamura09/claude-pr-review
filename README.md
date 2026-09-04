@@ -46,6 +46,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  statuses: write
 
 concurrency:
   group: pr-review-${{ github.event.pull_request.number }}
@@ -73,7 +74,26 @@ jobs:
 - 推測を書かない。指摘の前にコードを読んで裏付ける
 - 各指摘に「どんな入力・状態でどう壊れるか」を1文添える
 - 意味の変わらない書式・命名の好みは指摘しない
-- 指摘がなければ「問題なし」と短く言って終える
+- 1指摘あたり数行に収める。前置き・作業手順の説明・確認項目の列挙は書かない
+- 指摘がなければ1行で終える
+
+## 結果の見え方
+
+コメントを開かなくても分かるよう、**PR のチェック一覧に `claude-review` を出す。**
+
+| 状態 | 表示 |
+| --- | --- |
+| 指摘なし | ✅ `claude-review — 指摘なし` |
+| 指摘あり | ❌ `claude-review — 指摘 3件: <最も重いものの要約>` |
+| レビュー失敗 | ❌ `claude-review — レビューを完了できませんでした` |
+
+指摘があっても PR 全体を赤くしたくない場合は `findings_state: success` にする。
+件数と要約は説明文に出たまま、状態だけ緑になる。
+
+判定は Claude が書く `/tmp/review-verdict.json` から取る。ファイルが無い・壊れている
+場合は `error` として報告するので、Claude が落ちたときに「指摘なし」に見えることはない。
+
+コメント本文の1行目も `**✅ 指摘なし**` / `**⚠️ 指摘 N件** — 要約` に固定してある。
 
 ## 入力
 
@@ -86,6 +106,7 @@ jobs:
 | `timeout_minutes` | number | `20` | ジョブのタイムアウト |
 | `skip_authors` | string | `dependabot[bot],renovate[bot]` | レビューをスキップする作成者。カンマ区切り |
 | `skip_draft` | boolean | `true` | draft の PR をスキップするか |
+| `findings_state` | string | `failure` | 指摘があったときの `claude-review` チェックの状態。`success` にすると常に緑 |
 | `runs_on` | string | `ubuntu-latest` | 実行するランナー |
 
 ### Secrets
