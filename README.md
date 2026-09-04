@@ -81,7 +81,7 @@ jobs:
 | --- | --- | --- | --- |
 | `focus` | string | (上記3観点) | レビュー観点。指定すると既定の観点を**上書き**する |
 | `extra_instructions` | string | `""` | リポジトリ固有の追加指示。観点は残したまま末尾に足される |
-| `model` | string | `""` | 使用モデル。空なら Claude Code の既定 |
+| `model` | string | `claude-sonnet-5` | 使用モデル。空文字にすると Claude Code の既定に従う |
 | `max_turns` | number | `40` | Claude の最大ターン数 |
 | `timeout_minutes` | number | `20` | ジョブのタイムアウト |
 | `skip_authors` | string | `dependabot[bot],renovate[bot]` | レビューをスキップする作成者。カンマ区切り |
@@ -123,7 +123,8 @@ Dependabot が作成した PR の `pull_request` イベントで走るワーク�
 - **Secret を登録する前に呼び出し側を main に入れると、PR のチェックが赤くなる。**
   認証エラーで落ちるため、Secret の登録を先に済ませること。
 - **消費するのはサブスクリプションの利用枠。** push のたびに走る (同一 PR への連続
-  push は `concurrency` で古い実行をキャンセルする)。
+  push は `concurrency` で古い実行をキャンセルする)。既定のモデルは
+  `claude-sonnet-5`。`with: model:` で変更できる。
 - **トークンは失効する。** 失効するとワークフローが認証エラーで落ちるので、
   `claude setup-token` で再発行して Secret を更新する。
 - **このリポジトリが private の場合**、他のリポジトリから参照するには

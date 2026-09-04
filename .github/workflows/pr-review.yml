@@ -18,10 +18,10 @@ on:
         required: false
         default: ""
       model:
-        description: "使用モデル (例: claude-opus-5)。空なら Claude Code の既定"
+        description: "使用モデル。空文字にすると Claude Code の既定に従う"
         type: string
         required: false
-        default: ""
+        default: "claude-sonnet-5"
       max_turns:
         description: "Claude の最大ターン数"
         type: number
