@@ -80,6 +80,10 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.claude_code_oauth_token }}
+          # 明示しないと Claude GitHub App のトークンを OIDC で取りにいき、
+          # id-token: write と App のインストールが必要になる。
+          # GITHUB_TOKEN を渡せばその経路を使わず、権限もこのジョブの宣言どおりになる。
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           track_progress: true
           # 権限を contents: read にしてあるので push はできない。
           # そのうえでファイル編集系のツールも落としておく。
