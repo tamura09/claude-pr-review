@@ -1,0 +1,31 @@
+# 呼び出し側リポジトリの .github/workflows/pr-review.yml に置く。
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# 呼び出される側の permissions は呼び出し側を超えられない。
+# リポジトリ既定の GITHUB_TOKEN が read-only の場合、ここで明示しないと
+# レビューの投稿に失敗する。
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+# 連続 push のたびに走らせず、最新のコミットだけレビューする
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    uses: tamura09/claude-pr-review/.github/workflows/pr-review.yml@v1
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    # 必要に応じて上書きする
+    # with:
+    #   model: claude-opus-5
+    #   extra_instructions: |
+    #     このリポジトリは Prisma のスキーマ変更がマイグレーションを伴う。
+    #     prisma/schema.prisma の変更があれば、対応するマイグレーションの有無を確認すること。
