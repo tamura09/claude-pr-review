@@ -14,17 +14,20 @@ permissions:
   issues: write
   # claude-review チェックを PR のチェック一覧に出すため
   statuses: write
+  # OAuth トークンを AWS の SSM から読むための OIDC トークン発行
+  id-token: write
 
 # 連続 push のたびに走らせず、最新のコミットだけレビューする
 concurrency:
   group: pr-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# OAuth トークンはこのリポジトリの secret には置かない。AWS の SSM
+# (/claude-pr-review/oauth-token) に1本だけ置いてあり、呼び出された
+# ワークフローが OIDC で読む。上の id-token: write がそのために要る。
 jobs:
   review:
     uses: tamura09/claude-pr-review/.github/workflows/pr-review.yml@v1
-    secrets:
-      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     # 必要に応じて上書きする
     # with:
     #   model: claude-opus-5
@@ -32,3 +35,7 @@ jobs:
     #   extra_instructions: |
     #     このリポジトリは Prisma のスキーマ変更がマイグレーションを伴う。
     #     prisma/schema.prisma の変更があれば、対応するマイグレーションの有無を確認すること。
+    #
+    # AWS を使わず、このリポジトリの secret でトークンを渡すこともできる。
+    # secrets:
+    #   claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

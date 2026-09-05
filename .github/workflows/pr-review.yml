@@ -55,10 +55,29 @@ on:
         type: string
         required: false
         default: "ubuntu-latest"
+      aws_role_to_assume:
+        description: >-
+          OAuth トークンを SSM から読むために OIDC で引く IAM ロール。
+          claude_code_oauth_token を渡す場合は使われない
+        type: string
+        required: false
+        default: "arn:aws:iam::222165754930:role/github-actions-claude-pr-review"
+      aws_region:
+        description: "パラメータが置いてあるリージョン"
+        type: string
+        required: false
+        default: "ap-northeast-1"
+      oauth_token_parameter:
+        description: "OAuth トークンを入れた SSM パラメータの名前"
+        type: string
+        required: false
+        default: "/claude-pr-review/oauth-token"
     secrets:
       claude_code_oauth_token:
-        description: "claude setup-token で発行した OAuth トークン"
-        required: true
+        description: >-
+          claude setup-token で発行した OAuth トークン。
+          省略すると SSM から読む (aws_role_to_assume / oauth_token_parameter)
+        required: false
 
 permissions:
   contents: read
@@ -66,6 +85,8 @@ permissions:
   issues: write
   # claude-review チェックを PR のチェック一覧に出すため
   statuses: write
+  # OAuth トークンを SSM から読むための OIDC トークン発行
+  id-token: write
 
 jobs:
   review:
@@ -87,9 +108,60 @@ jobs:
           # ベースブランチとの差分を取るため履歴ごと取得する
           fetch-depth: 0
 
+      # 呼び出し側は secret を持たないのが既定。reusable workflow は呼び出され側の
+      # secret を読めないため、各リポジトリに同じトークンを複製する運用になって
+      # いた。AWS の SSM に1本だけ置き、OIDC で読む。
+      #
+      # 呼び出し側が claude_code_oauth_token を渡した場合はそちらを使い、AWS には
+      # 触らない。
+      #
+      # secrets コンテキストは step の if では読めないので、いったん env 経由で
+      # 受けてフラグに落とす。
+      - name: Decide where the token comes from
+        id: token_source
+        env:
+          CALLER_TOKEN: ${{ secrets.claude_code_oauth_token }}
+        run: |
+          if [ -n "${CALLER_TOKEN}" ]; then
+            echo "from_ssm=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "from_ssm=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Configure AWS credentials
+        if: ${{ steps.token_source.outputs.from_ssm == 'true' }}
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ inputs.aws_role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Read the Claude OAuth token from SSM
+        id: oauth_token
+        if: ${{ steps.token_source.outputs.from_ssm == 'true' }}
+        env:
+          PARAMETER_NAME: ${{ inputs.oauth_token_parameter }}
+        run: |
+          set -euo pipefail
+
+          token="$(aws ssm get-parameter \
+            --name "${PARAMETER_NAME}" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)"
+
+          if [ -z "${token}" ] || [ "${token}" = "MANAGED_OUTSIDE_TERRAFORM" ]; then
+            echo "::error::${PARAMETER_NAME} はまだ実際のトークンで埋められていません。" \
+                 "claude setup-token で発行し、aws ssm put-parameter --overwrite で投入してください。"
+            exit 1
+          fi
+
+          # 出力に混ざってもログに出ないようにマスクする
+          echo "::add-mask::${token}"
+          echo "token=${token}" >> "${GITHUB_OUTPUT}"
+
       - uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.claude_code_oauth_token }}
+          claude_code_oauth_token: ${{ secrets.claude_code_oauth_token || steps.oauth_token.outputs.token }}
           # 明示しないと Claude GitHub App のトークンを OIDC で取りにいき、
           # id-token: write と App のインストールが必要になる。
           # GITHUB_TOKEN を渡せばその経路を使わず、権限もこのジョブの宣言どおりになる。
