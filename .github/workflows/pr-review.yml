@@ -140,6 +140,7 @@ jobs:
         if: ${{ steps.token_source.outputs.from_ssm == 'true' }}
         env:
           PARAMETER_NAME: ${{ inputs.oauth_token_parameter }}
+          PARAMETER_REGION: ${{ inputs.aws_region }}
         run: |
           set -euo pipefail
 
@@ -150,8 +151,10 @@ jobs:
             --output text)"
 
           if [ -z "${token}" ] || [ "${token}" = "MANAGED_OUTSIDE_TERRAFORM" ]; then
-            echo "::error::${PARAMETER_NAME} はまだ実際のトークンで埋められていません。" \
-                 "claude setup-token で発行し、aws ssm put-parameter --overwrite で投入してください。"
+            echo "::error::${PARAMETER_NAME} (${PARAMETER_REGION}) はまだ実際のトークンで" \
+                 "埋められていません。claude setup-token で発行し、" \
+                 "aws ssm put-parameter --region ${PARAMETER_REGION} --overwrite で投入してください。" \
+                 "--region を省くと別のリージョンに作られて、ここからは見えません。"
             exit 1
           fi
 

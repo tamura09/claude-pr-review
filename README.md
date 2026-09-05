@@ -47,8 +47,22 @@ claude setup-token
 表示されたトークンをコピーしてから:
 
 ```bash
-aws ssm put-parameter --name /claude-pr-review/oauth-token \
+aws ssm put-parameter --region ap-northeast-1 \
+  --name /claude-pr-review/oauth-token \
   --type SecureString --overwrite --value "$(pbpaste)"
+```
+
+**`--region` を省略しないこと。** CLI の既定リージョンが別だと、`--overwrite` は
+そのリージョンに同じ名前のパラメータを新しく作って成功する。ワークフローは
+ap-northeast-1 を読むので、置いたつもりで置けていない状態になる。
+
+投入できたかは、値を出さずに長さだけ見れば確認できる。プレースホルダのままなら
+26 になる。
+
+```bash
+aws ssm get-parameter --region ap-northeast-1 \
+  --name /claude-pr-review/oauth-token --with-decryption \
+  --query 'Parameter.Value' --output text | wc -c
 ```
 
 `--value` にトークンを直接書くとシェル履歴と `ps` の出力に残るので避ける。
