@@ -1,0 +1,49 @@
+# このリポジトリ自身の PR も、同じワークフローでレビューさせる。
+#
+# examples/pr-review.yml と違い `uses:` はローカル参照にしてある。pull_request
+# では PR 側のコミットから読まれるので、プロンプトを変えた PR はその新しい
+# プロンプト自身でレビューされる。壊した場合もその PR の上で分かる。
+#
+# fork からの PR は呼び出され側の job の if で落ちるため、外部がプロンプトを
+# 書き換えて実行させることはできない。
+name: Self Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# 呼び出される側の permissions は呼び出し側を超えられない
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  # claude-review チェックを PR のチェック一覧に出すため
+  statuses: write
+  # OAuth トークンを SSM から読むための OIDC トークン発行
+  id-token: write
+
+concurrency:
+  group: self-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# トークンはこのリポジトリの secret には置かず、SSM から OIDC で読む。
+# ロールの信頼ポリシーが repo:tamura09/*:pull_request なので、このリポジトリも
+# そのまま対象に入る。
+jobs:
+  review:
+    uses: ./.github/workflows/pr-review.yml
+    with:
+      extra_instructions: |
+        このリポジトリの中身は GitHub Actions のワークフローと、その使い方を
+        書いた README・サンプルだけです。次を重点的に見てください。
+
+        - 式展開 (`github.event.*` や `inputs.*` の値) を `run:` のスクリプトに
+          直接埋めていないか。env 経由で受けないとシェルに注入できる
+        - `permissions` が必要以上に広くないか。fork からの PR を落とす job の
+          `if` が効いたままか
+        - トークンやパラメータの値がログや `GITHUB_OUTPUT` 経由で漏れないか
+          (`add-mask` の漏れ、`set -x` の混入)
+        - 呼び出され側のプロンプトが出力させる verdict 行の書式と、それを読む
+          チェック出力ステップの正規表現が食い違っていないか
+        - README と examples/pr-review.yml が、実際の入力名・既定値・権限と
+          一致しているか。ワークフローを変えたら両方の追随が要る

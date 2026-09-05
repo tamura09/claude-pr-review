@@ -109,6 +109,18 @@ jobs:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
+## このリポジトリ自身もレビューする
+
+[`.github/workflows/self-review.yml`](./.github/workflows/self-review.yml) が
+同じワークフローを `uses: ./.github/workflows/pr-review.yml` で呼んでいるので、
+このリポジトリへの PR もレビューされる。ローカル参照なので **PR 側のコミットの
+プロンプトが使われる。** プロンプトを変える PR は、その新しいプロンプト自身で
+レビューされることになる。
+
+`extra_instructions` で、式展開の `run:` への直接埋め込み、`permissions` の
+広さ、トークンのログ漏れ、verdict 行の書式とそれを読む正規表現のずれ、
+README と `examples/pr-review.yml` の追随漏れを見るよう足してある。
+
 ## レビュー内容
 
 既定の観点は3つ。
