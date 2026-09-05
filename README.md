@@ -109,6 +109,26 @@ jobs:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
+## このリポジトリ自身もレビューする
+
+[`.github/workflows/self-review.yml`](./.github/workflows/self-review.yml) が
+同じワークフローを `uses: ./.github/workflows/pr-review.yml` で呼んでいるので、
+このリポジトリへの PR もレビューされる。ローカル参照なので **PR 側のコミットの
+プロンプトが使われる。** プロンプトを変える PR は、その新しいプロンプト自身で
+レビューされることになる。
+
+`extra_instructions` で、式展開の `run:` への直接埋め込み、`permissions` の
+広さ、トークンのログ漏れ、verdict 行の書式とそれを読む正規表現のずれ、
+README と `examples/pr-review.yml` の追随漏れを見るよう足してある。
+
+**信頼境界はこのリポジトリへの push 権限。** `pull_request` ではワークフローが
+head 側のコミットから読まれるので、push 権限を持つ人は PR を出すだけで、
+マージ承認を経ずに書き換えたプロンプトやステップを `id-token: write` 付きで
+実行できる。`uses:` を main 固定にしても `self-review.yml` 自体が head から
+読まれるので塞がらない。SSM の OAuth トークンは push 権限を持つ人からは
+隠せないものとして扱う。fork からの PR は呼び出され側の `if` で落ちるため、
+外部からこの経路には入れない。
+
 ## レビュー内容
 
 既定の観点は3つ。
