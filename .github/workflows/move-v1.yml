@@ -1,0 +1,56 @@
+# main が動いたら `v1` タグをその先頭に追従させる。
+#
+# 呼び出し側 (現在16リポジトリ) はすべて可変タグ `@v1` を参照している。タグの
+# 更新は手作業だったため、main にマージしてもタグを動かし忘れると、呼び出し側は
+# 古いコミットを参照したままになる。
+#
+# これが起きると症状が分かりにくい。入力や必須 secret が食い違った場合、
+# GitHub はジョブを1つも作らず `startup_failure` で終わる。ログもチェック欄への
+# 出力も無いので、PR 上では「レビューが来ない」ようにしか見えない。実際に
+# `v1` が SSM 対応前のコミットを指したまま取り残され、全リポジトリで
+# レビューが静かに止まっていたことがある。
+#
+# 破壊的変更を入れるときは、このワークフローを止めるのではなく `v2` を切って
+# 呼び出し側を移す。`v1` は「v1 系の最新」であって「特定のコミット」ではない。
+name: Move v1
+
+on:
+  push:
+    branches: [main]
+
+# タグを付け替えるため。既定の権限は read なので明示が要る
+permissions:
+  contents: write
+
+# 連続してマージされたときにタグの付け替えが交錯しないよう直列化する
+concurrency:
+  group: move-v1
+  cancel-in-progress: false
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    steps:
+      # push イベントの github.sha ではなく、実行時点の main の先頭を読む。
+      # 直列化していても、先にマージされた側の実行が後になった場合に
+      # タグを巻き戻してしまうため
+      - name: v1 を main の先頭に動かす
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          sha=$(gh api "repos/${GH_REPO}/commits/${BRANCH}" --jq '.sha')
+
+          # タグが消えている場合もあるので、無ければ作る
+          if gh api "repos/${GH_REPO}/git/ref/tags/v1" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/${GH_REPO}/git/refs/tags/v1" \
+              -f sha="${sha}" -F force=true >/dev/null
+          else
+            gh api --method POST "repos/${GH_REPO}/git/refs" \
+              -f ref="refs/tags/v1" -f sha="${sha}" >/dev/null
+          fi
+
+          echo "v1 -> ${sha}"
