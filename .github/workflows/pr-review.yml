@@ -36,7 +36,7 @@ on:
         description: "レビューをスキップする作成者。カンマ区切り"
         type: string
         required: false
-        default: "dependabot[bot],renovate[bot]"
+        default: "dependabot[bot],renovate[bot],tamura09-renovate[bot]"
       skip_draft:
         description: "draft の PR をスキップするか"
         type: boolean
@@ -93,6 +93,10 @@ jobs:
     # fork からの PR は Secrets を読めないためスキップする。
     # skip_authors に載っている bot もスキップする (Dependabot は pull_request では
     # Secrets を読めないので、レビューしたい場合は schedule で別途動かす必要がある)。
+    #
+    # tamura09-renovate[bot] は tamura09/renovate-runner が使う GitHub App。依存の
+    # 更新 PR は差分が機械的で、上流のリリースノートを読み込ませる意味も薄いので
+    # 既定では見ない。レビューさせたい呼び出し側は skip_authors を上書きする。
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
       !(inputs.skip_draft && github.event.pull_request.draft) &&
