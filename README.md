@@ -203,7 +203,7 @@ head 側のコミットから読まれるので、push 権限を持つ人は PR 
 | `model` | string | `claude-sonnet-5` | 使用モデル。空文字にすると Claude Code の既定に従う |
 | `max_turns` | number | `40` | Claude の最大ターン数 |
 | `timeout_minutes` | number | `20` | ジョブのタイムアウト |
-| `skip_authors` | string | `dependabot[bot],renovate[bot]` | レビューをスキップする作成者。カンマ区切り |
+| `skip_authors` | string | `dependabot[bot],renovate[bot],tamura09-renovate[bot]` | レビューをスキップする作成者。カンマ区切り |
 | `skip_draft` | boolean | `true` | draft の PR をスキップするか |
 | `findings_state` | string | `failure` | 指摘があったときの `claude-review` チェックの状態。`success` にすると常に緑 |
 | `runs_on` | string | `ubuntu-latest` | 実行するランナー |
@@ -246,6 +246,17 @@ Dependabot が作成した PR の `pull_request` イベントで走るワーク�
 なる)、`id-token: write` も与えられない。そのため既定で `skip_authors` に
 入れてある。Dependabot の PR もレビューしたい場合は、`schedule` で main 上から
 走らせる別のワークフローが必要になる。
+
+### Renovate について
+
+`tamura09-renovate[bot]` は [tamura09/renovate-runner](https://github.com/tamura09/renovate-runner)
+が使う GitHub App。Dependabot と違って Secrets も OIDC も普通に使えるので、技術的な
+制約でスキップしているわけではない。依存の更新 PR は差分が機械的で、上流のリリース
+ノートを読み込ませる意味も薄いため、既定では見ないことにしている。
+
+レビューさせたい場合は呼び出し側で `skip_authors` を上書きする。逆に、更新 PR を
+自動マージする仕組みを別に持っているリポジトリ (monstdb) では、そちらと二重に
+Claude が走らないよう既定のままにしておく。
 
 ## 注意点
 
