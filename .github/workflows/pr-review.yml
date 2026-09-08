@@ -8,7 +8,7 @@ on:
   workflow_call:
     inputs:
       focus:
-        description: "レビュー観点。既定はバグ・セキュリティ・設計。差し替えると既定の観点を上書きする"
+        description: "レビュー観点。既定はバグ・セキュリティ・設計・ドキュメントの陳腐化。差し替えると既定の観点を上書きする"
         type: string
         required: false
         default: ""
