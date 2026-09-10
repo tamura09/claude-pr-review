@@ -109,7 +109,7 @@ jobs:
     runs-on: ${{ inputs.runs_on }}
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # ベースブランチとの差分を取るため履歴ごと取得する
           fetch-depth: 0
@@ -136,7 +136,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: ${{ steps.token_source.outputs.from_ssm == 'true' }}
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
         with:
           role-to-assume: ${{ inputs.aws_role_to_assume }}
           aws-region: ${{ inputs.aws_region }}
@@ -168,7 +168,7 @@ jobs:
           echo "::add-mask::${token}"
           echo "token=${token}" >> "${GITHUB_OUTPUT}"
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@19dda84776b3518d98b8798e591daee763049ed3 # v1
         with:
           claude_code_oauth_token: ${{ secrets.claude_code_oauth_token || steps.oauth_token.outputs.token }}
           # 明示しないと Claude GitHub App のトークンを OIDC で取りにいき、
