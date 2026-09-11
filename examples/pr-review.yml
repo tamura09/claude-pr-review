@@ -29,6 +29,8 @@ concurrency:
 # ワークフローが OIDC で読む。上の id-token: write がそのために要る。
 jobs:
   review:
+    # `@v1` と書いておけば、Renovate が初回の実行で `@<sha> # v1` に固定し、
+    # 以後は v1 の移動を digest 更新として追う。手で SHA を調べる必要はない。
     uses: tamura09/claude-pr-review/.github/workflows/pr-review.yml@v1
     # 必要に応じて上書きする
     # with:
