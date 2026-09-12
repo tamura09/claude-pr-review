@@ -260,8 +260,14 @@ head 側のコミットから読まれるので、push 権限を持つ人は PR 
 Dependabot が作成した PR の `pull_request` イベントで走るワークフローは、
 リポジトリの Actions Secrets を読めず (Dependabot Secrets という別の保管場所に
 なる)、`id-token: write` も与えられない。そのため既定で `skip_authors` に
-入れてある。Dependabot の PR もレビューしたい場合は、`schedule` で main 上から
-走らせる別のワークフローが必要になる。
+入れてある。
+
+Dependabot の PR もレビューしたい場合は、`schedule` で main 上から走らせる別の
+ワークフローが要る。ただしその OIDC subject は `ref:refs/heads/main` になり、
+`github-actions-claude-pr-review` の信頼ポリシーは `pull_request` しか許可して
+いない。そのリポジトリを名指しで足すこと (tamura09/aws-terraform の
+`base/iam.tf`)。ワイルドカードには戻さない。1本のために、オーナー配下の全
+リポジトリの main 上のワークフローがこのトークンを読めるようになる。
 
 ### Renovate について
 
@@ -270,9 +276,8 @@ Dependabot が作成した PR の `pull_request` イベントで走るワーク�
 制約でスキップしているわけではない。依存の更新 PR は差分が機械的で、上流のリリース
 ノートを読み込ませる意味も薄いため、既定では見ないことにしている。
 
-レビューさせたい場合は呼び出し側で `skip_authors` を上書きする。逆に、更新 PR を
-自動マージする仕組みを別に持っているリポジトリ (monstdb) では、そちらと二重に
-Claude が走らないよう既定のままにしておく。
+レビューさせたい場合は呼び出し側で `skip_authors` を上書きする。`pull_request`
+イベントのままなので、信頼ポリシーには何も足さなくてよい。
 
 ## 注意点
 
