@@ -149,8 +149,8 @@ OAuth の refresh 後は手動更新が必要になるため、SSM 経由を推�
 
 ## フォールバックの動作
 
-Codex Action が失敗したときだけ Claude を起動する。利用枠超過のほか、認証・通信・
-Action 自体の失敗、空の最終回答も対象にする。Codex が成功したときは Claude OAuth token を
+Codex CLI が失敗したときだけ Claude を起動する。利用枠超過のほか、認証・通信・
+CLI の導入・実行失敗、空の最終回答も対象にする。Codex が成功したときは Claude OAuth token を
 SSM から読まず、Claude も起動しない。
 
 Codex は GPT-5.6 Terra・read-only 権限でローカルの差分と関連コードを読み、最終回答を
