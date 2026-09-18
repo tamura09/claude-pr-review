@@ -10,8 +10,8 @@
 # (マージ承認なしに) 書き換えた prompt を走らせられる。pull_request では
 # ワークフローが head 側から読まれるためで、`uses:` を main 固定にしても
 # 塞がらない (このファイル自体も head 側から読まれるので、ステップを足せば
-# 同じことができる)。id-token: write が付いている以上、SSM の OAuth トークンは
-# push 権限を持つ人からは隠せない。
+# 同じことができる)。id-token: write が付いている以上、SSM の Claude OAuth token と
+# Codex auth.json は push 権限を持つ人からは隠せず、後者の書き換えもできる。
 name: Self Review
 
 on:
@@ -25,7 +25,7 @@ permissions:
   issues: write
   # claude-review チェックを PR のチェック一覧に出すため
   statuses: write
-  # OAuth トークンを SSM から読むための OIDC トークン発行
+  # Claude/Codex の認証情報を SSM から読むための OIDC トークン発行
   id-token: write
   # CI の実行結果を Claude に読ませるため (github_ci MCP に必要)
   actions: read
@@ -51,6 +51,8 @@ jobs:
           `if` が効いたままか
         - トークンやパラメータの値がログや `GITHUB_OUTPUT` 経由で漏れないか
           (`add-mask` の漏れ、`set -x` の混入)
+        - Codex 成功時に Claude の OAuth token を読んでいないか。各モデルの実行前に
+          AWS の一時認証情報を消し、Codex refresh 後だけ auth.json を SSM へ戻しているか
         - 呼び出され側のプロンプトが出力させる verdict 行の書式と、それを読む
           チェック出力ステップの正規表現が食い違っていないか
         - README と examples/pr-review.yml が、実際の入力名・既定値・権限と

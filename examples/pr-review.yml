@@ -14,7 +14,7 @@ permissions:
   issues: write
   # claude-review チェックを PR のチェック一覧に出すため
   statuses: write
-  # OAuth トークンを AWS の SSM から読むための OIDC トークン発行
+  # Claude/Codex の認証情報を AWS の SSM から読むための OIDC トークン発行
   id-token: write
   # CI の実行結果を Claude に読ませるため (github_ci MCP に必要)
   actions: read
@@ -24,9 +24,9 @@ concurrency:
   group: pr-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-# OAuth トークンはこのリポジトリの secret には置かない。AWS の SSM
-# (/claude-pr-review/oauth-token) に1本だけ置いてあり、呼び出された
-# ワークフローが OIDC で読む。上の id-token: write がそのために要る。
+# 認証情報はこのリポジトリの secret には置かない。AWS の SSM に Claude OAuth
+# token と Codex auth.json が1本ずつあり、呼び出されたワークフローが OIDC で読む。
+# 上の id-token: write がそのために要る。
 jobs:
   review:
     # `@v1` と書いておけば、Renovate が初回の実行で `@<sha> # v1` に固定し、
@@ -40,6 +40,7 @@ jobs:
     #     このリポジトリは Prisma のスキーマ変更がマイグレーションを伴う。
     #     prisma/schema.prisma の変更があれば、対応するマイグレーションの有無を確認すること。
     #
-    # AWS を使わず、このリポジトリの secret でトークンを渡すこともできる。
+    # AWS を使わず、このリポジトリの secrets で認証情報を渡すこともできる。
     # secrets:
     #   claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    #   codex_auth_json: ${{ secrets.CODEX_AUTH_JSON }}
