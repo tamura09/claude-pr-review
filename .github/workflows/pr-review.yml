@@ -166,7 +166,7 @@ jobs:
         id: codex_aws
         if: ${{ steps.token_source.outputs.codex_from_ssm == 'true' }}
         continue-on-error: true
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
         with:
           role-to-assume: ${{ inputs.aws_role_to_assume }}
           aws-region: ${{ inputs.aws_region }}
@@ -226,7 +226,7 @@ jobs:
         id: codex_node
         if: ${{ always() && steps.codex_auth.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "24"
 
@@ -372,7 +372,7 @@ jobs:
           always() &&
           steps.codex.outcome != 'skipped' &&
           steps.token_source.outputs.codex_from_ssm == 'true'
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
         with:
           role-to-assume: ${{ inputs.aws_role_to_assume }}
           aws-region: ${{ inputs.aws_region }}
@@ -448,7 +448,7 @@ jobs:
            steps.codex.outputs.final-message == '') &&
           steps.token_source.outputs.claude_from_ssm == 'true'
         continue-on-error: true
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
         with:
           role-to-assume: ${{ inputs.aws_role_to_assume }}
           aws-region: ${{ inputs.aws_region }}
@@ -508,7 +508,7 @@ jobs:
            steps.codex.outputs.final-message == '') &&
           (steps.token_source.outputs.claude_from_ssm == 'false' ||
            steps.oauth_token.outcome == 'success')
-        uses: anthropics/claude-code-action@19dda84776b3518d98b8798e591daee763049ed3 # v1
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
         with:
           claude_code_oauth_token: ${{ secrets.claude_code_oauth_token || steps.oauth_token.outputs.token }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
