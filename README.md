@@ -1,4 +1,4 @@
-# claude-pr-review
+# pr-review
 
 [Codex の GPT-5.6 Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra) に
 PR をレビューさせる再利用可能ワークフロー。Codex の実行が
@@ -23,9 +23,9 @@ reusable workflow は呼び出され側 (このリポジトリ) の secret を�
 
 | もの | 実体 |
 | --- | --- |
-| Claude パラメータ | `/claude-pr-review/oauth-token` (SecureString, ap-northeast-1) |
-| Codex パラメータ | `/claude-pr-review/codex-auth-json` (SecureString, ap-northeast-1) |
-| ロール | `github-actions-claude-pr-review` |
+| Claude パラメータ | `/pr-review/oauth-token` (SecureString, ap-northeast-1) |
+| Codex パラメータ | `/pr-review/codex-auth-json` (SecureString, ap-northeast-1) |
+| ロール | `github-actions-pr-review` |
 | 定義 | `tamura09/aws-terraform` の `base/iam.tf` と `regions/ap-northeast-1/claude_pr_review_secrets.tf` |
 
 ロールの信頼ポリシーは `repo:tamura09/*:pull_request` と
@@ -47,7 +47,7 @@ reusable workflow は呼び出され側 (このリポジトリ) の secret を�
 codex login
 
 aws ssm put-parameter --region ap-northeast-1 \
-  --name /claude-pr-review/codex-auth-json \
+  --name /pr-review/codex-auth-json \
   --type SecureString --tier Advanced --overwrite \
   --value file:///absolute/path/to/.codex/auth.json
 ```
@@ -81,7 +81,7 @@ claude setup-token
 
 ```bash
 aws ssm put-parameter --region ap-northeast-1 \
-  --name /claude-pr-review/oauth-token \
+  --name /pr-review/oauth-token \
   --type SecureString --overwrite --value "$(pbpaste)"
 ```
 
@@ -94,7 +94,7 @@ ap-northeast-1 を読むので、置いたつもりで置けていない状態�
 
 ```bash
 aws ssm get-parameter --region ap-northeast-1 \
-  --name /claude-pr-review/oauth-token --with-decryption \
+  --name /pr-review/oauth-token --with-decryption \
   --query 'Parameter.Value' --output text | wc -c
 ```
 
@@ -129,7 +129,7 @@ concurrency:
 
 jobs:
   review:
-    uses: tamura09/claude-pr-review/.github/workflows/pr-review.yml@v1
+    uses: tamura09/pr-review/.github/workflows/pr-review.yml@v1
 ```
 
 AWS を使わないリポジトリでは、呼び出し側の secrets から両方を渡せる。片方だけを
@@ -138,7 +138,7 @@ AWS を使わないリポジトリでは、呼び出し側の secrets から両�
 ```yaml
 jobs:
   review:
-    uses: tamura09/claude-pr-review/.github/workflows/pr-review.yml@v1
+    uses: tamura09/pr-review/.github/workflows/pr-review.yml@v1
     secrets:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       codex_auth_json: ${{ secrets.CODEX_AUTH_JSON }}
@@ -271,12 +271,12 @@ head 側のコミットから読まれるので、push 権限を持つ人は PR 
 | `skip_draft` | boolean | `true` | draft の PR をスキップするか |
 | `findings_state` | string | `failure` | 指摘があったときの `claude-review` チェックの状態。`success` にすると常に緑 |
 | `runs_on` | string | `ubuntu-latest` | 実行するランナー |
-| `aws_role_to_assume` | string | `arn:aws:iam::222165754930:role/github-actions-claude-pr-review` | トークンを読むために OIDC で引くロール |
+| `aws_role_to_assume` | string | `arn:aws:iam::222165754930:role/github-actions-pr-review` | トークンを読むために OIDC で引くロール |
 | `aws_region` | string | `ap-northeast-1` | パラメータのあるリージョン |
-| `oauth_token_parameter` | string | `/claude-pr-review/oauth-token` | トークンを入れた SSM パラメータ名 |
+| `oauth_token_parameter` | string | `/pr-review/oauth-token` | トークンを入れた SSM パラメータ名 |
 | `claude_fallback` | boolean | `true` | Codex 失敗時に Claude で再試行するか |
 | `codex_effort` | string | `""` | GPT-5.6 Terra の reasoning effort。空文字なら既定 |
-| `codex_auth_parameter` | string | `/claude-pr-review/codex-auth-json` | Codex `auth.json` を入れた SSM パラメータ名 |
+| `codex_auth_parameter` | string | `/pr-review/codex-auth-json` | Codex `auth.json` を入れた SSM パラメータ名 |
 
 ### Secrets
 
@@ -290,7 +290,7 @@ head 側のコミットから読まれるので、push 権限を持つ人は PR 
 - `contents: read` しか要求しないので、Codex も Claude もコードを push できない
 - `id-token: write` は増えるが、これは OIDC トークンを発行できるだけで、
   引けるロールは AWS 側の信頼ポリシーが決める。そのロールにあるのは
-  `/claude-pr-review/oauth-token` と `/claude-pr-review/codex-auth-json` の
+  `/pr-review/oauth-token` と `/pr-review/codex-auth-json` の
   `ssm:GetParameter`、Codex 認証更新用の後者だけの `ssm:PutParameter`、SSM 経由に
   限定した KMS の暗号化・復号権限だけ
 - SSM から認証情報を読んだ直後に AWS の一時認証情報を job 環境から消すため、
@@ -320,7 +320,7 @@ Dependabot が作成した PR の `pull_request` イベントで走るワーク�
 
 Dependabot の PR もレビューしたい場合は、`schedule` で main 上から走らせる別の
 ワークフローが要る。ただしその OIDC subject は `ref:refs/heads/main` になり、
-`github-actions-claude-pr-review` の信頼ポリシーは `pull_request` しか許可して
+`github-actions-pr-review` の信頼ポリシーは `pull_request` しか許可して
 いない。そのリポジトリを名指しで足すこと (tamura09/aws-terraform の
 `base/iam.tf`)。ワイルドカードには戻さない。1本のために、オーナー配下の全
 リポジトリの main 上のワークフローがこのトークンを読めるようになる。
@@ -349,7 +349,7 @@ Dependabot の PR もレビューしたい場合は、`schedule` で main 上か
   `with: model:` はフォールバック Claude のモデルだけを変える。
 - **Codex OAuth 認証も失効しうる。** 通常の refresh は workflow が SSM へ保存する。
   refresh 自体が拒否された場合は `codex login` をやり直し、
-  `/claude-pr-review/codex-auth-json` を上書きする。Claude フォールバックも失敗した場合、
+  `/pr-review/codex-auth-json` を上書きする。Claude フォールバックも失敗した場合、
   `claude-review` チェックは error になる。
 - **トークンは失効する。** 失効するとワークフローが認証エラーで落ちるので、
   `claude setup-token` で再発行して SSM パラメータを上書きする。更新するのは
