@@ -134,6 +134,21 @@ jobs:
           # ベースブランチとの差分を取るため履歴ごと取得する
           fetch-depth: 0
 
+      # checkout の refspec に依存せず、レビュー対象の base ref を明示的に取得して
+      # 差分を一度生成する。ここで失敗した場合はモデルを起動せず、レビュー不能の
+      # 原因を job と PR コメントに残す。
+      - name: Prepare PR diff
+        id: review_diff
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          base="origin/${BASE_REF}"
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git merge-base "${base}" HEAD >/dev/null
+          git diff --no-ext-diff "${base}...HEAD" > "${RUNNER_TEMP}/pr-review.diff"
+
       # 呼び出し側は secret を持たないのが既定。reusable workflow は呼び出され側の
       # secret を読めないため、各リポジトリに同じ認証情報を複製する運用になって
       # いた。AWS の SSM に1本ずつ置き、OIDC で読む。
@@ -164,7 +179,9 @@ jobs:
 
       - name: Configure AWS credentials for Codex
         id: codex_aws
-        if: ${{ steps.token_source.outputs.codex_from_ssm == 'true' }}
+        if: >-
+          steps.review_diff.outcome == 'success' &&
+          steps.token_source.outputs.codex_from_ssm == 'true'
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
         with:
@@ -175,6 +192,7 @@ jobs:
         id: codex_auth
         if: >-
           always() &&
+          steps.review_diff.outcome == 'success' &&
           (steps.token_source.outputs.codex_from_ssm == 'false' || steps.codex_aws.outcome == 'success')
         continue-on-error: true
         env:
@@ -438,10 +456,29 @@ jobs:
           gh api --method POST "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
             -f body="${body}" >/dev/null
 
+      - name: Report PR diff preparation failure
+        if: ${{ always() && steps.review_diff.outcome != 'success' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          body="**❌ レビュー不能** — PR 差分を取得できませんでした。
+
+          レビューを実行していません。Prepare PR diff の job log で base branch の取得・比較エラーを確認してください。
+
+          ---
+          _[Workflow run](${RUN_URL})_"
+          gh api --method POST "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+            -f body="${body}" >/dev/null
+
       - name: Configure AWS credentials for the Claude fallback
         id: claude_aws
         if: >-
           always() &&
+          steps.review_diff.outcome == 'success' &&
           inputs.claude_fallback &&
           (steps.codex_auth.outcome != 'success' ||
            steps.codex.outcome != 'success' ||
@@ -457,6 +494,7 @@ jobs:
         id: oauth_token
         if: >-
           always() &&
+          steps.review_diff.outcome == 'success' &&
           inputs.claude_fallback &&
           (steps.codex_auth.outcome != 'success' ||
            steps.codex.outcome != 'success' ||
@@ -486,6 +524,7 @@ jobs:
       - name: Remove AWS credentials from Claude
         if: >-
           always() &&
+          steps.review_diff.outcome == 'success' &&
           inputs.claude_fallback &&
           (steps.codex_auth.outcome != 'success' ||
            steps.codex.outcome != 'success' ||
@@ -502,6 +541,7 @@ jobs:
         id: claude
         if: >-
           always() &&
+          steps.review_diff.outcome == 'success' &&
           inputs.claude_fallback &&
           (steps.codex_auth.outcome != 'success' ||
            steps.codex.outcome != 'success' ||
@@ -558,6 +598,7 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           FINDINGS_STATE: ${{ inputs.findings_state }}
+          REVIEW_DIFF_OUTCOME: ${{ steps.review_diff.outcome }}
         run: |
           # 途中で失敗してもチェックだけは必ず出したいので -e は付けない
           set -uo pipefail
@@ -565,38 +606,42 @@ jobs:
           state=error
           description="レビューを完了できませんでした"
 
-          # この実行が投稿したコメントだけを拾う (本文に実行URLが入っている)
-          body=$(gh api "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" --paginate \
-            --jq "[.[] | select(.user.login == \"github-actions[bot]\")
-                       | select(.body | contains(\"/actions/runs/${RUN_ID}\"))]
-                  | last | .body // empty" 2>/dev/null) || body=""
-
-          if [ -n "$body" ]; then
-            # JavaScript はシェルで展開しない。
-            # shellcheck disable=SC2016
-            out=$(BODY="$body" node -e '
-              const body = process.env.BODY || "";
-              const onFindings = process.env.FINDINGS_STATE || "failure";
-              const clean = /\*\*\s*✅\s*指摘なし\s*\*\*/.test(body);
-              const m = body.match(
-                /\*\*\s*⚠️\s*指摘\s*(\d+)\s*件\s*\*\*\s*[—―–\-]?\s*(.*)/,
-              );
-              if (clean && !m) {
-                process.stdout.write("success\t指摘なし");
-              } else if (m) {
-                const headline = (m[2] || "").trim().slice(0, 100);
-                const desc = `指摘 ${m[1]}件${headline ? ": " + headline : ""}`;
-                process.stdout.write(onFindings + "\t" + desc.slice(0, 130));
-              }
-            ' 2>/dev/null) || out=""
-            if [ -n "$out" ]; then
-              state=${out%%$'\t'*}
-              description=${out#*$'\t'}
-            else
-              echo "コメントに verdict 行が見つからなかった"
-            fi
+          if [ "${REVIEW_DIFF_OUTCOME}" != "success" ]; then
+            description="PR差分を取得できませんでした"
           else
-            echo "この実行のコメントが見つからなかった"
+            # この実行が投稿したコメントだけを拾う (本文に実行URLが入っている)
+            body=$(gh api "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" --paginate \
+              --jq "[.[] | select(.user.login == \"github-actions[bot]\")
+                         | select(.body | contains(\"/actions/runs/${RUN_ID}\"))]
+                    | last | .body // empty" 2>/dev/null) || body=""
+
+            if [ -n "$body" ]; then
+              # JavaScript はシェルで展開しない。
+              # shellcheck disable=SC2016
+              out=$(BODY="$body" node -e '
+                const body = process.env.BODY || "";
+                const onFindings = process.env.FINDINGS_STATE || "failure";
+                const clean = /\*\*\s*✅\s*指摘なし\s*\*\*/.test(body);
+                const m = body.match(
+                  /\*\*\s*⚠️\s*指摘\s*(\d+)\s*件\s*\*\*\s*[—―–\-]?\s*(.*)/,
+                );
+                if (clean && !m) {
+                  process.stdout.write("success\t指摘なし");
+                } else if (m) {
+                  const headline = (m[2] || "").trim().slice(0, 100);
+                  const desc = `指摘 ${m[1]}件${headline ? ": " + headline : ""}`;
+                  process.stdout.write(onFindings + "\t" + desc.slice(0, 130));
+                }
+              ' 2>/dev/null) || out=""
+              if [ -n "$out" ]; then
+                state=${out%%$'\t'*}
+                description=${out#*$'\t'}
+              else
+                echo "コメントに verdict 行が見つからなかった"
+              fi
+            else
+              echo "この実行のコメントが見つからなかった"
+            fi
           fi
 
           echo "claude-review: ${state} / ${description}"
